@@ -37,6 +37,10 @@ const createProduct = async (req, res) => {
 // Actualizar un producto por ID
 const updateProduct = async (req, res) => {
   try {
+    // Verificar si el campo "family" viene en el req.body
+    if (req.body.family && !['JetSky', 'Cuatriciclos', 'Equipo de buceo', 'Tabla de surf niños', 'Tabla de surf adultos'].includes(req.body.family)) {
+      return res.status(400).send({ message: 'El campo "family" no es válido' });
+    }
     const updatedProduct = await Product.findByIdAndUpdate(req.params.id, req.body, { new: true });
     if (!updatedProduct) {
       return res.status(404).send({ message: 'Producto no encontrado' });

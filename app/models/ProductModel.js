@@ -1,10 +1,15 @@
 const mongoose = require('mongoose');
 
 const productSchema = new mongoose.Schema({
-  name: {
+  family: {
     type: String,
     required: true,
     enum: ['JetSky', 'Cuatriciclos', 'Equipo de buceo', 'Tabla de surf niños', 'Tabla de surf adultos']
+  },
+  name: {
+    type: String,
+    required: true,
+    unique: true
   },
   description: String,
   pricePerTurn: {
