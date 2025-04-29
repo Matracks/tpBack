@@ -74,10 +74,11 @@ El servidor estará disponible en `http://localhost:3000`.
 ### Alquileres
 
 - **GET /rentals**: Obtiene todos los alquileres.
-- **GET /rentals/:id**: Obtiene un alquiler por su ID.
+- **GET /rentals/:id/:date**: Obtiene un alquiler por su ID.
 - **POST /rentals**: Crea un nuevo alquiler.
-- **PUT /rentals/:id**: Actualiza un alquiler por su ID.
-- **DELETE /rentals/:id**: Elimina un alquiler por su ID.
+- **POST /rentals/release-unpaid**: Libera los efectivos pendientes con 2hs de tiempo.
+- **PATCH /rentals/:id**: Cancela un alquiler por su ID.
+- **PUT /rentals/unpaid/:id**: Actualiza el estado de un pago.
 
 ---
 
@@ -85,7 +86,6 @@ El servidor estará disponible en `http://localhost:3000`.
 
 1. **Dispositivos de seguridad**:
    - Los productos como JetSky y Cuatriciclos requieren cascos y chalecos salvavidas.
-   - Máximo 2 personas por producto.
 
 2. **Duración del turno**:
    - Cada turno dura 30 minutos.
@@ -108,12 +108,6 @@ El servidor estará disponible en `http://localhost:3000`.
 ## Pruebas
 
 Puedes usar herramientas como **Postman** o **Thunder Client** para probar los endpoints de la API. Asegúrate de que el servidor esté corriendo antes de realizar las solicitudes.
-
----
-
-## Autor
-
-- **Matías** - Estudiante de FullStack en la Universidad de Palermo.
 
 ---
 

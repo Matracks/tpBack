@@ -37,25 +37,36 @@ const createRentals = async (req, res) => {
       }
     }
 
+    // Agrupar turnos por producto y cliente
+    const productTurnMap = {}; // Mapa para agrupar turnos por producto y cliente
+
     for (const rentalData of rentals) {
-      const { product, startTime, customerInfo, paymentMethod } = rentalData;
+      const { product, startTime, customerInfo, paymentMethod, totalAmount, persons } = rentalData;
 
       // Verificar que el producto exista
       const productExists = await Product.findById(product);
+
       if (!productExists) {
         return res.status(404).send({ message: `El producto con ID ${product} no existe.` });
       }
 
-      // Validar que el precio por turno sea igual al que viene del frontend
-      if (productExists.pricePerTurn !== totalAmount) {
-        return res.status(400).send({
-          message: `El precio por turno para el producto con ID ${product} no coincide. Precio esperado: ${productExists.pricePerTurn}, precio recibido: ${totalAmount}.`,
-        });
+      const key = `${product}-${customerInfo.idNumber}`; // Clave única por producto y cliente
+      if (!productTurnMap[key]) {
+        productTurnMap[key] = [];
       }
 
+      // Agregar el turno enviado desde el frontend al mapa
+      productTurnMap[key].push(new Date(startTime));
+      
       // Si se requeiren dispositivos de seguridad
       if(productExists.requiresSafetyDevices) {
-        totalAmount += productExists.safetyDevicesPrice; // Sumar el precio de los dispositivos de seguridad al total
+        // Validar que el precio por turno sea igual al que viene del frontend
+        expectedPrice = productExists.pricePerTurn + productExists.safetyDevicesPrice * persons;
+        if (expectedPrice !== totalAmount) {
+          return res.status(400).send({
+            message: `El precio por turno para el producto con ID ${product} no coincide. Precio esperado: ${expectedPrice}, precio recibido: ${rentalData.totalAmount}.`,
+          });
+        }
       }
 
       // Validar que el turno no sea mayor a 48 horas de anticipación
@@ -84,9 +95,40 @@ const createRentals = async (req, res) => {
 
       if(hasDifferentProducts) {
         rentalData.discountApplied = rentalData.totalAmount * 0.10; // Guardar el descuento aplicado
-        rentalData.totalAmount *= 0.9; // Aplicar un 10% de descuento si hay productos diferentes
+        rentalData.finalAmount = rentalData.totalAmount - rentalData.discountApplied; // Aplicar un 10% de descuento si hay productos diferentes
+      } else {
+        if (rentalData.discountApplied && rentalData.discountApplied > 0) {
+          return res.status(400).send({
+            message: 'No se puede aplicar un descuento si los productos no son diferentes.',
+          });
+        }
+        rentalData.finalAmount = rentalData.totalAmount; // Si no hay productos diferentes, el monto final es igual al total
       }
     }
+
+        // Validar consecutividad para cada producto y cliente
+        for (const key in productTurnMap) {
+          const turnTimes = productTurnMap[key];
+    
+          // Ordenar los turnos por fecha
+          turnTimes.sort((a, b) => a - b);
+    
+          // Verificar si hay más de 3 turnos consecutivos
+          let consecutiveCount = 1;
+          for (let i = 1; i < turnTimes.length; i++) {
+            const diff = (turnTimes[i] - turnTimes[i - 1]) / (1000 * 60); // Diferencia en minutos
+            if (diff === 30) {
+              consecutiveCount++;
+              if (consecutiveCount > 3) {
+                return res.status(400).send({
+                  message: `No se pueden tomar más de 3 turnos consecutivos para el producto con ID ${key.split('-')[0]}.`,
+                });
+              }
+            } else {
+              consecutiveCount = 1; // Reiniciar el contador si no son consecutivos
+            }
+          }
+        }
 
     // Si todas las validaciones pasan, guardar las reservas
     const savedRentals = [];
@@ -124,6 +166,14 @@ const cancelRental = async (req, res) => {
     const now = new Date();
     if (new Date(rental.startTime) <= now) {
       return res.status(400).send({ message: 'No se puede cancelar una reserva cuyo turno ya ha pasado.' });
+    }
+
+    // Validar si la cancelación es con menos de 2 horas de anticipación
+    const twoHoursBefore = new Date(rental.startTime.getTime() - 2 * 60 * 60 * 1000); // 2 horas antes del turno
+    if (now > twoHoursBefore && !isStormCancellation) {
+      return res.status(400).send({
+        message: 'No se puede cancelar la reserva con menos de 2 horas de anticipación, salvo por tormenta.',
+      });
     }
 
     // Actualizar el estado de la reserva
@@ -183,9 +233,66 @@ const getProductTimes = async (req, res) => {
   }
 };
 
+// Liberar turnos no pagados
+const releaseUnpaidRentals = async (req, res) => {
+  try {
+    const now = new Date();
+
+    // Buscar reservas con método de pago en efectivo, estado pendiente y con menos de 2 horas para el turno
+    const rentalsToRelease = await Rental.find({
+      paymentMethod: { $in: ['efectivo_local', 'efectivo_extranjero'] },
+      paymentStatus: 'pendiente',
+      startTime: { $lte: new Date(now.getTime() + 2 * 60 * 60 * 1000) } // Turnos dentro de las próximas 2 horas
+    });
+
+    for (const rental of rentalsToRelease) {
+      rental.paymentStatus = 'cancelado'; // Cambiar el estado a cancelado
+      rental.cancellationReason = 'Liberado por falta de pago'; // Motivo de la cancelación
+      rental.cancellationTime = now; // Registrar la fecha y hora de cancelación
+      await rental.save();
+    }
+
+    res.status(200).send({
+      message: `Se liberaron ${rentalsToRelease.length} reservas no pagadas.`,
+      rentals: rentalsToRelease,
+    });
+  } catch (error) {
+    res.status(500).send({ message: 'Error al liberar reservas no pagadas.', error });
+  }
+};
+
+// Actualizar el estado de pago de un alquiler a "pagado"
+const   updatePaymentStatus
+= async (req, res) => {
+  try {
+    const { id } = req.params; // id del alquiler
+
+    const rental = await Rental.findById(id);
+
+    if (!rental) {
+      return res.status(404).send({
+        message: 'No se encontró un alquiler con el ID proporcionado.',
+      });
+    }
+
+    // Actualizar el estado de pago a "pagado"
+    rental.paymentStatus = 'pagado';
+    await rental.save();
+
+    res.status(200).send({
+      message: 'El estado de pago se actualizó correctamente a "pagado".',
+      rental,
+    });
+  } catch (error) {
+    res.status(500).send({ message: 'Error al actualizar el estado de pago.', error });
+  }
+};
+
 module.exports = {
   listAllRentals,
   createRentals,
   cancelRental,
   getProductTimes,
+  releaseUnpaidRentals,
+  updatePaymentStatus
 };

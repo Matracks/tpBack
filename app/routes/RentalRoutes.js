@@ -4,15 +4,17 @@ const {
   listAllRentals,
   createRentals,
   cancelRental,
-  getProductTimes
+  getProductTimes,
+  releaseUnpaidRentals,
+  updatePaymentStatus,
 } = require('../controllers/RentalController');
 
 
 router.get('/', listAllRentals); // Listo todas las reservas  
-router.get('/product-times/:productId/:date', getProductTimes); // Listo los horarios ocupados de un producto en un día específico
-// router.get('/:id', listProductById);
+router.get('/:productId/:date', getProductTimes); // Listo los horarios ocupados de un producto en un día específico
 router.post('/', createRentals); // Crear una nueva reserva
-// router.put('/:id', updateProduct);
+router.post('/release-unpaid', releaseUnpaidRentals); // Liberar reservas no pagadas
 router.patch('/:id', cancelRental); // Cancelar una reserva por ID
+router.put('/unpaid/:id', updatePaymentStatus); // Actualizar el estado de pago de una reserva por número de documento del usuario
 
 module.exports = router;

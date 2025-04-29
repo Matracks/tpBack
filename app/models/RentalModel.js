@@ -7,6 +7,10 @@ const rentalSchema = new mongoose.Schema({
         phone: { type: String, required: true },
         idNumber: { type: String, required: true }
     },
+    persons: {
+        type: Number,
+        required: true // Número de personas para el alquiler
+    },
     product: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Product', // Relación con el modelo Product
