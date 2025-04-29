@@ -21,15 +21,15 @@ const productSchema = new mongoose.Schema({
     type: Boolean,
     default: false
   },
+  safetyDevicesPrice: {
+    type: Number,
+    default: 0
+  },
   maxPeople: {
     type: Number,
     default: 1
   },
-  available: {
-    type: Boolean,
-    default: true
-  },
   imageUrl: String
-}, { timestamps: true }); // Crea un campo de fecha de creación y actualización automáticamente
+}, { timestamps: true }); // Agrega automáticamente createdAt y updatedAt
 
 module.exports = mongoose.model('Product', productSchema);

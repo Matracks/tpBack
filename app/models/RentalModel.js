@@ -7,56 +7,47 @@ const rentalSchema = new mongoose.Schema({
         phone: { type: String, required: true },
         idNumber: { type: String, required: true }
     },
-  products: [{
     product: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'Product',
-      required: true
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Product', // Relación con el modelo Product
+        required: true
     },
-    quantity: {
-      type: Number,
-      default: 1,
-      min: 1
+    startTime: {
+        type: Date,
+        required: true // Fecha de inicio del alquiler
+    },
+    paymentMethod: {
+        type: String,
+        enum: ['efectivo_local', 'efectivo_extranjero', 'tarjeta', 'pendiente'], // Métodos de pago
+        default: 'pendiente'
+    },
+    paymentStatus: {
+        type: String,
+        enum: ['pendiente', 'pagado', 'cancelado', 'reembolsado_parcial'], // Estados de pago
+        default: 'pendiente'
+    },
+    totalAmount: {
+        type: Number,
+        required: true // Monto total del turno
+    },
+    discountApplied: {
+        type: Number,
+        default: 0 // Descuento aplicado (si corresponde)
+    },
+    finalAmount: {
+        type: Number,
+        required: true // Monto final después de aplicar descuentos
+    },
+    cancellationTime: {
+        type: Date // Fecha de cancelación (si aplica)
+    },
+    cancellationReason: {
+        type: String // Razón de la cancelación (si aplica)
+    },
+    isStormCancellation: {
+        type: Boolean,
+        default: false // Indica si la cancelación fue por tormenta
     }
-  }],
-  startTime: {
-    type: Date,
-    required: true
-  },
-  turns: {
-    type: Number,
-    required: true,
-    min: 1,
-    max: 3
-  },
-  paymentMethod: {
-    type: String,
-    enum: ['efectivo_local', 'efectivo_extranjero', 'tarjeta', 'pendiente'],
-    default: 'pendiente'
-  },
-  paymentStatus: {
-    type: String,
-    enum: ['pendiente', 'pagado', 'cancelado', 'reembolsado_parcial'],
-    default: 'pendiente'
-  },
-  totalAmount: {
-    type: Number,
-    required: true
-  },
-  discountApplied: {
-    type: Number,
-    default: 0
-  },
-  finalAmount: {
-    type: Number,
-    required: true
-  },
-  cancellationTime: Date,
-  cancellationReason: String,
-  isStormCancellation: {
-    type: Boolean,
-    default: false
-  }
-}, { timestamps: true });
+}, { timestamps: true }); // Agrega automáticamente createdAt y updatedAt
 
 module.exports = mongoose.model('Rental', rentalSchema);
