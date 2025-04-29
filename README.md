@@ -49,12 +49,7 @@ Antes de comenzar, asegúrate de tener instalado:
 
 Para iniciar el servidor en modo desarrollo con **Nodemon**:
 ```bash
-npm run dev
-```
-
-Para iniciar el servidor en modo producción:
-```bash
-npm start
+npx nodemon server.js
 ```
 
 El servidor estará disponible en `http://localhost:3000`.
