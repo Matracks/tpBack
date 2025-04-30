@@ -8,7 +8,6 @@ Este proyecto es una API para gestionar el sistema de alquiler de productos como
 - **Express**: Framework para construir la API.
 - **MongoDB**: Base de datos NoSQL para almacenar productos y alquileres.
 - **Mongoose**: ODM para interactuar con MongoDB.
-- **Nodemon**: Herramienta para reiniciar automáticamente el servidor durante el desarrollo.
 
 ---
 
