@@ -245,7 +245,11 @@ const cancelRentalStorm = async (req, res) => {
       return res.status(400).send({ error: 'No se puede cancelar una reserva cuyo turno ya ha pasado.' });
     }
 
-    // Solo permitir cancelación por tormenta
+    // Validar si la cancelación es por tormenta
+    if (rental.isStormCancellation) {
+      return res.status(400).send({ error: 'La reserva ya ha sido cancelada por tormenta.' });
+    }
+    // Actualizar el estado de la reserva
     rental.cancellationTime = now;
     rental.isStormCancellation = true;
     rental.paymentStatus = 'reembolsado_parcial';
