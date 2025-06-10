@@ -21,7 +21,7 @@ const listTodayRentals = async (req, res) => {
 
     const rentals = await Rental.find({
       startTime: { $gte: startOfDay, $lte: endOfDay },
-      paymentStatus: { $ne: 'cancelado' }
+      //paymentStatus: { $ne: 'cancelado' }
     }).populate('product');
     console.log(rentals);
     res.status(200).send(rentals);
@@ -102,8 +102,11 @@ const createRentals = async (req, res) => {
       });
 
       if (checkProductTime) {
+        // Obtener el nombre del producto
+        const productObj = await Product.findById(product);
+        const productName = productObj ? productObj.name : product;
         return res.status(400).send({
-          error: `El producto con ID ${product} ya está reservado para el horario ${startTime}.`,
+          error: `El producto ${productName} ya está reservado para el horario ${startTime}.`,
         });
       }
 

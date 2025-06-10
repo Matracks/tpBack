@@ -21,6 +21,6 @@ router.post('/', createRentals); // Crear una nueva reserva
 router.patch('/cancel/:id', cancelRental);
 router.post('/release-unpaid', releaseUnpaidRentals); // Liberar reservas no pagadas
 router.patch('/storm/:id', cancelRentalStorm); // Cancelar una reserva por ID
-router.put('/unpaid/:id', updatePaymentStatus); // Actualizar el estado de pago de una reserva por número de documento del usuario
+router.put('/unpaid/:id', updatePaymentStatus); // Actualizar el estado de pago de una reserva
 
 module.exports = router;
