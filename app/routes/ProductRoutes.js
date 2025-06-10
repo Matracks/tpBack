@@ -5,12 +5,14 @@ const {
   listProductById,
   createProduct,
   updateProduct,
-  deleteProduct
+  deleteProduct,
+  listProductsByFamily
 } = require('../controllers/ProductController');
 
 
 router.get('/', listAllProducts);
 router.get('/:id', listProductById);
+router.get('/family/:family', listProductsByFamily);
 router.post('/', createProduct);
 router.put('/:id', updateProduct);
 router.delete('/:id', deleteProduct);

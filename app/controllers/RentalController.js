@@ -12,6 +12,24 @@ const listAllRentals = async (req, res) => {
   }
 };
 
+// Listar reservas del día de hoy
+const listTodayRentals = async (req, res) => {
+  try {
+    const now = new Date();
+    const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
+    const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+
+    const rentals = await Rental.find({
+      startTime: { $gte: startOfDay, $lte: endOfDay },
+      paymentStatus: { $ne: 'cancelado' }
+    }).populate('product');
+    console.log(rentals);
+    res.status(200).send(rentals);
+  } catch (error) {
+    res.status(500).send({ error: 'Error al obtener las reservas del día.', error });
+  }
+};
+
 // Crear múltiples alquileres
 const createRentals = async (req, res) => {
   try {
@@ -64,7 +82,7 @@ const createRentals = async (req, res) => {
         expectedPrice = productExists.pricePerTurn + productExists.safetyDevicesPrice * persons;
         if (expectedPrice !== totalAmount) {
           return res.status(400).send({
-            message: `El precio por turno para el producto con ID ${product} no coincide. Precio esperado: ${expectedPrice}, precio recibido: ${rentalData.totalAmount}.`,
+            error: `El precio por turno para el producto con ID ${product} no coincide. Precio esperado: ${expectedPrice}, precio recibido: ${rentalData.totalAmount}.`,
           });
         }
       }
@@ -73,7 +91,7 @@ const createRentals = async (req, res) => {
       const now = new Date();
       const maxStartTime = new Date(now.getTime() + 48 * 60 * 60 * 1000); // 48 horas desde ahora
       if (new Date(startTime) > maxStartTime) {
-        return res.status(400).send({ message: 'Los turnos no pueden reservarse con más de 48 horas de anticipación.' });
+        return res.status(400).send({ error: 'Los turnos no pueden reservarse con más de 48 horas de anticipación.' });
       }
 
       // Verificar disponibilidad del producto en el horario solicitado
@@ -85,7 +103,7 @@ const createRentals = async (req, res) => {
 
       if (checkProductTime) {
         return res.status(400).send({
-          message: `El producto con ID ${product} ya está reservado para el horario ${startTime}.`,
+          error: `El producto con ID ${product} ya está reservado para el horario ${startTime}.`,
         });
       }
 
@@ -120,8 +138,11 @@ const createRentals = async (req, res) => {
             if (diff === 30) {
               consecutiveCount++;
               if (consecutiveCount > 3) {
+                const productId = key.split('-')[0];
+                const product = await Product.findById(productId);
+                const productName = product ? product.name : productId;
                 return res.status(400).send({
-                  message: `No se pueden tomar más de 3 turnos consecutivos para el producto con ID ${key.split('-')[0]}.`,
+                  error: `No se pueden tomar más de 3 turnos consecutivos para el producto con ID ${productName}.`,
                 });
               }
             } else {
@@ -145,47 +166,56 @@ const createRentals = async (req, res) => {
       rentals: savedRentals,
     });
   } catch (error) {
-    res.status(500).send({ message: 'Error al crear las reservas.', error });
+    res.status(500).send({ error: 'Error al crear las reservas.', error });
   }
 };
 
-// Cancelar una reserva
+// Obtener una reserva por ID
+const getRentalById = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const rental = await Rental.findById(id).populate('product');
+    if (!rental) {
+      return res.status(404).send({ message: 'Reserva no encontrada.' });
+    }
+    res.status(200).send(rental);
+  } catch (error) {
+    res.status(500).send({ error: 'Error al obtener la reserva.', error });
+  }
+};
+
+// Cancelar una reserva, sin costo hasta 2 horas antes del turno.
 const cancelRental = async (req, res) => {
   try {
     const { id } = req.params; // ID de la reserva a cancelar
-    const { cancellationReason, isStormCancellation } = req.body;
+    
+    const { cancellationReason } = 'Sin especificar'
 
     // Buscar la reserva por ID
     const rental = await Rental.findById(id);
 
     if (!rental) {
-      return res.status(404).send({ message: 'Reserva no encontrada.' });
+      return res.status(404).send({ error: 'Reserva no encontrada.' });
     }
 
     // Validar si el turno ya pasó
     const now = new Date();
     if (new Date(rental.startTime) <= now) {
-      return res.status(400).send({ message: 'No se puede cancelar una reserva cuyo turno ya ha pasado.' });
+      return res.status(400).send({ error: 'No se puede cancelar una reserva cuyo turno ya ha pasado.' });
     }
 
     // Validar si la cancelación es con menos de 2 horas de anticipación
     const twoHoursBefore = new Date(rental.startTime.getTime() - 2 * 60 * 60 * 1000); // 2 horas antes del turno
-    if (now > twoHoursBefore && !isStormCancellation) {
+    if (now > twoHoursBefore) {
       return res.status(400).send({
-        message: 'No se puede cancelar la reserva con menos de 2 horas de anticipación, salvo por tormenta.',
+        error: 'No se puede cancelar la reserva con menos de 2 horas de anticipación.',
       });
     }
 
     // Actualizar el estado de la reserva
     rental.cancellationTime = now; // Registrar la fecha y hora de cancelación
-    rental.isStormCancellation = isStormCancellation || false; // Indicar si fue por tormenta
-    if(isStormCancellation) {
-      rental.paymentStatus = 'reembolsado_parcial'; // Cambiar el estado de pago a reembolsado parcial si fue por tormenta
-      rental.cancellationReason = "Tormenta"; // Establecer el motivo de la cancelación
-    } else {
-      rental.paymentStatus = 'cancelado'; // Cambiar el estado de pago a cancelado
-      rental.cancellationReason = cancellationReason || 'Sin especificar'; // Establecer el motivo de la cancelación
-    }
+    rental.paymentStatus = 'cancelado'; // Cambiar el estado de pago a cancelado
+    rental.cancellationReason = cancellationReason || 'Sin especificar'; // Establecer el motivo de la cancelación
 
     await rental.save();
 
@@ -194,7 +224,43 @@ const cancelRental = async (req, res) => {
       rental,
     });
   } catch (error) {
-    res.status(500).send({ message: 'Error al cancelar la reserva.', error });
+    res.status(500).send({ error: 'Error al cancelar la reserva.', error });
+  }
+};
+
+// Cancelar reserva por tormenta
+const cancelRentalStorm = async (req, res) => {
+  try {
+    const { id } = req.params; // ID de la reserva a cancelar
+
+    // Buscar la reserva por ID y si no existe devuelve un mensaje
+    const rental = await Rental.findById(id);
+    if (!rental) {
+      return res.status(404).send({ message: 'Reserva no encontrada.' });
+    }
+
+    // Validar si el turno ya pasó
+    const now = new Date();
+    if (new Date(rental.startTime) <= now) {
+      return res.status(400).send({ error: 'No se puede cancelar una reserva cuyo turno ya ha pasado.' });
+    }
+
+    // Solo permitir cancelación por tormenta
+    rental.cancellationTime = now;
+    rental.isStormCancellation = true;
+    rental.paymentStatus = 'reembolsado_parcial';
+    rental.cancellationReason = "Tormenta imprevista";
+    rental.finalAmount = rental.finalAmount * 0.5; // Aplico el 50% de reembolso
+
+    await rental.save();
+
+    res.status(200).send({
+      message: 'Reserva cancelada por tormenta. Se reembolsa el 50% del valor abonado.',
+      finalAmount: rental.finalAmount,
+      rental,
+    });
+  } catch (error) {
+    res.status(500).send({ error: 'Error al cancelar la reserva por tormenta.', error });
   }
 };
 
@@ -257,13 +323,12 @@ const releaseUnpaidRentals = async (req, res) => {
       rentals: rentalsToRelease,
     });
   } catch (error) {
-    res.status(500).send({ message: 'Error al liberar reservas no pagadas.', error });
+    res.status(500).send({ error: 'Error al liberar reservas no pagadas.', error });
   }
 };
 
 // Actualizar el estado de pago de un alquiler a "pagado"
-const   updatePaymentStatus
-= async (req, res) => {
+const updatePaymentStatus = async (req, res) => {
   try {
     const { id } = req.params; // id del alquiler
 
@@ -284,15 +349,18 @@ const   updatePaymentStatus
       rental,
     });
   } catch (error) {
-    res.status(500).send({ message: 'Error al actualizar el estado de pago.', error });
+    res.status(500).send({ error: 'Error al actualizar el estado de pago.', error });
   }
 };
 
 module.exports = {
   listAllRentals,
   createRentals,
-  cancelRental,
+  cancelRentalStorm,
+  getRentalById,
   getProductTimes,
   releaseUnpaidRentals,
-  updatePaymentStatus
+  updatePaymentStatus,
+  cancelRental,
+  listTodayRentals
 };
